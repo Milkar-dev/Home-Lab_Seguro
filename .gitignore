@@ -212,3 +212,8 @@ __marimo__/
 /home/usuario/.local/share/Trash/
 /etc/someconfig/
 /build/
+
+
+# ==== Logs / temporales ====
+logs/
+*.log
