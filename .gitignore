@@ -205,3 +205,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ==== Arch / Home-Lab ====
+/var/cache/pacman/pkg/
+/tmp/
+/home/usuario/.local/share/Trash/
+/etc/someconfig/
+/build/
