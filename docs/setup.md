@@ -103,7 +103,7 @@ useradd -m -G wheel -s /bin/bash mil
 passwd mil
 EDITOR=vim visudo
 ## Descomentar: %wheel ALL=(ALL:ALL) ALL
-### Esto deja el sistema con el usuario mil listo para trabajar y con permisos para administrar el sistema, si deseas cambiar de usuario, eres libre de hacerlo
+#### Esto deja el sistema con el usuario mil listo para trabajar y con permisos para administrar el sistema, si deseas cambiar de usuario, eres libre de hacerlo
 
 
 ## 8. Finalización
@@ -111,10 +111,10 @@ exit
 umount -R /mnt
 swapoff -a
 reboot
-### Se desmonta y se reinicia al nuevo sistema base
+#### Se desmonta y se reinicia al nuevo sistema base
 
-# Tras reiniciar, el sistema pedirá la contraseña LUKS antes de arrancar.
-# Si todo ha ido bien, tendrás un Arch Linux completamente funcional, cifrado y con red: la base perfecta para seguir con el proyecto de Home-Lab Seguro.
+### Tras reiniciar, el sistema pedirá la contraseña LUKS antes de arrancar.
+### Si todo ha ido bien, tendrás un Arch Linux completamente funcional, cifrado y con red: la base perfecta para seguir con el proyecto de Home-Lab Seguro.
 
 
 
