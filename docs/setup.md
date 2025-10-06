@@ -27,26 +27,26 @@ ping archlinux.org                # Comprueba conexión a Internet
 ## 2. Particionado del disco
 ### Se usa fdisk para crear dos particiones para un HHD (una pequeña de 512 MB para EFI):
 fdisk /dev/sda
-# n → nueva partición (EFI)
-# Enter → número por defecto (1)
-# Enter → sector inicial por defecto
-# +512M → tamaño de la partición
-# t → cambia el tipo
-# 1 → EFI System
-# n → nueva partición (resto del disco para el sistema)
-# Enter → acepta todo el espacio libre
-# w → guardar y salir
+n → nueva partición (EFI)
+Enter → número por defecto (1)
+Enter → sector inicial por defecto
++512M → tamaño de la partición
+t → cambia el tipo
+1 → EFI System
+n → nueva partición (resto del disco para el sistema)
+Enter → acepta todo el espacio libre
+w → guardar y salir
 
 ### Para crear las particiones para SSD se utiliza esto:
 fdisk /dev/nvme0n1
-# n → nueva partición (EFI)
-# Enter → número y sector por defecto
-# +512M → tamaño EFI
-# t → cambia tipo
-# 1 → EFI System
-# n → nueva partición (resto del disco para el sistema)
-# Enter → acepta todo el espacio restante
-# w → guardar y salir
+n → nueva partición (EFI)
+Enter → número y sector por defecto
++512M → tamaño EFI
+t → cambia tipo
+1 → EFI System
+n → nueva partición (resto del disco para el sistema)
+Enter → acepta todo el espacio restante
+w → guardar y salir
 
 
 ## 3. Cifrado y montaje
