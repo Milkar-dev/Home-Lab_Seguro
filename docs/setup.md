@@ -51,37 +51,96 @@
 
 
 
-## 3. Cifrado y montaje
-#### Aquí se cifra la partición principal y se monta para preparar la instalación. Esto protege los datos incluso si alguien accede físicamente al disco.
-- cryptsetup luksFormat /dev/sda2         # Cifra la partición principal
-- cryptsetup open /dev/sda2 cryptroot     # Desbloquea la partición cifrada
-- mkfs.ext4 /dev/mapper/cryptroot         # Formatea el sistema de archivos principal
-- mkfs.fat -F32 /dev/sda1                 # Formatea la partición EFI
-- mount /dev/mapper/cryptroot /mnt        # Monta la raíz
-- mkdir /mnt/boot
-- mount /dev/sda1 /mnt/boot
+## 3. Particionado del disco (con fdisk)
+
+Ejemplo usando `/dev/sda` como disco principal.  
+Crea dos particiones: una **EFI** (512 MB) y una **principal cifrada (resto del disco)**.
+
+---
+
+#### 1. Abrir fdisk
+
+fdisk /dev/sda
+
+#### 2. Si hay particiones viejas creamos una nueva tabla
+Command (m for help): g        # crea nueva tabla GPT limpia
+
+#### 3. Crear partición EFI
+Command (m for help): n
+Partition number: 1
+First sector: <Enter>
+Last sector: +512M
+Command (m for help): t
+Partition type: 1    # EFI System
+
+#### 4: Crear partición raiz
+Command (m for help): n
+Partition number: 2
+First sector: <Enter>
+Last sector: <Enter> (usa todo el espacio)
+
+#### 5. Verificar la tabla
+Command (m for help): p
+- Debe verse algo como:
+Device      Start       End   Sectors   Size Type
+/dev/sda1    2048   1050623   1048576   512M EFI System
+/dev/sda2 1050624 234441647 233391024 111.3G Linux filesystem
+
+#### 6. Guardar y salir:
+Command (m for help): w
 
 
 
-## 4. Instalación del sistema base
-#### Se instalan los paquetes mínimos para arrancar el sistema y manejar la red.
-- pacstrap /mnt base linux linux-firmware vim networkmanager
-- genfstab -U /mnt >> /mnt/etc/fstab
-- arch-chroot /mnt
+
+
+## 📦 4. Instalación del sistema base
+#### Se instalan los paquetes mínimos necesarios para que el sistema pueda arrancar y disponer de red funcional.
+
+pacstrap /mnt base linux linux-firmware vim nano sudo networkmanager lvm2 cryptsetup
+
+#### Genera la tabla de sistemas de archivos (fstab) para que se monten automáticamente al inicio.
+genfstab -U /mnt >> /mnt/etc/fstab
+Para verificar qeu las entradas sean correctas usamos esto: cat /mnt/etc/fstab
+
+#### Entramos sistema
+arch-chroot /mnt
 
 
 
 
-## 5. Configuración básica
+## 5. Configuración básica y chroot
 #### Se establecen la zona horaria, el idioma, el nombre del equipo y el teclado.
-- ln -sf /usr/share/zoneinfo/Europe/Madrid /etc/localtime
-- hwclock --systohc
-- echo "LANG=es_ES.UTF-8" > /etc/locale.conf
-- echo "KEYMAP=es" > /etc/vconsole.conf
-- echo "homelab" > /etc/hostname
-- sed -i 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-- sed -i 's/#es_ES.UTF-8 UTF-8/es_ES.UTF-8 UTF-8/' /etc/locale.gen
-- locale-gen
+arch-chroot /mnt /bin/bash
+
+#### zona horaria
+ln -sf /usr/share/zoneinfo/Europe/Madrid /etc/localtime
+hwclock --systohc
+
+#### locales
+echo "es_ES.UTF-8 UTF-8" >> /etc/locale.gen
+locale-gen
+echo "LANG=es_ES.UTF-8" > /etc/locale.conf
+
+#### hostname
+echo "mi-host" > /etc/hostname
+#### editar /etc/hosts
+cat >> /etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   mi-host.localdomain mi-host
+EOF
+
+#### root passwd
+passwd
+
+#### crear usuario (ejemplo 'mil')
+useradd -m -G wheel -s /bin/bash mil
+passwd mil
+
+#### permitir sudo para wheel (usa visudo y descomenta %wheel ALL=(ALL) ALL)
+pacman -S --noconfirm sudo
+EDITOR=nano visudo
+
 #### Aquí se deja el sistema listo con la hora en Madrid, idioma español y teclado español, si deseas cambiarlo, eres libre de hacerlo
 
 
@@ -89,30 +148,38 @@
 
 ## 6. Configurar mkinitcpio y GRUB con cifrado
 #### Esta parte es clave: se indica al sistema que el disco está cifrado, para que pida la contraseña al arrancar.
-- sed -i 's/HOOKS=(.*)/HOOKS=(base udev autodetect modconf block encrypt filesystems keyboard fsck)/' /etc/mkinitcpio.conf
-- mkinitcpio -P
 
-- pacman -S grub efibootmgr --noconfirm
-- grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+- Si usas el initramfs por defecto (busybox-ish), añade keyboard encrypt lvm2 antes de filesystems.
+- Si usas systemd initramfs, usa sd-encrypt y lvm2 (ejemplo abajo).
 
-- UUID=$(blkid -s UUID -o value /dev/sda2)
-- sed -i "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$UUID:cryptroot root=/dev/mapper/cryptroot\"|" /etc/default/grub
-- grub-mkconfig -o /boot/grub/grub.cfg
+HOOKS=(base systemd autodetect modconf kms keyboard sd-vconsole block sd-encrypt lvm2 filesystems fsck)
+mkinitcpio -P
 
-#### `mkinitcpio` crea la imagen del sistema con los hooks necesarios para abrir el disco cifrado.
-#### `GRUB` luego añade los parámetros para descifrarlo al iniciar.
+#### Importante: el orden importa — encrypt/sd-encrypt debe ir antes de lvm2 para que el contenedor se desbloquee antes de activar volúmenes. Revisa la página de dm-crypt y mkinitcpio.
 
 
 
 
-## 7. Servicios y usuario
-- systemctl enable NetworkManager
-- passwd
-- useradd -m -G wheel -s /bin/bash mil
-- passwd mil
-- EDITOR=vim visudo
-- Descomentar: %wheel ALL=(ALL:ALL) ALL
-- Esto deja el sistema con el usuario mil listo para trabajar y con permisos para administrar el sistema, si deseas cambiar de usuario, eres libre de hacerlo
+## 7. Configurar cargadoe de arranque, servicios y usuario
+#### instalar grub y efibootmgr
+pacman -S --noconfirm grub efibootmgr
+
+#### instalar grub en UEFI
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+
+#### averigua UUID de la partición LUKS (UUID del superblock)
+cryptsetup luksUUID /dev/sda2   # guarda ese UUID en variable
+
+#### editar /etc/default/grub y añadir:
+ GRUB_CMDLINE_LINUX="cryptdevice=UUID=TU_UUID_AQUI:cryptroot root=/dev/vg0/root"
+
+#### si usas LVM, ejemplo:
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=TU_UUID_AQUI:cryptroot root=/dev/vg0/root"
+#### activar que GRUB pueda desbloquear disco (opcional)
+GRUB_ENABLE_CRYPTODISK=y
+
+#### generar cfg
+grub-mkconfig -o /boot/grub/grub.cfg
 
 
 
